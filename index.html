@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="imgUploader.css">
+</head>
+
+<body>
+    <div id="imgContainer"></div>
+</body>
+
+
+<script src='jquery.js'></script>
+<script>
+    (function (imgContainer) {
+        var container = new containerObj(imgContainer).init(),
+            area = new selAreaObj($('#areaWrapper')),
+            userPhoto = false,
+            loadDone = false;
+
+        $('#selectArea').mouseenter(function (event) {
+            if (!area.onCornersImg)
+                area.onTarget = true;
+            $(document.body).css('cursor', 'move');
+        });
+        $('#selectArea').mouseleave(function (event) {
+            area.onTarget = false;
+            if (!area.moveEn)
+                $(document.body).css('cursor', 'default');
+        });
+        $('#selectArea').mousedown(function (event) {
+            if (area.onTarget) {
+                var position = area.getPosition();
+                area.setShift(
+                    event.pageX - container.positionX - (position[0] - container.positionX),
+                    event.pageY - container.positionY - (position[1] - container.positionY)
+                );
+                area.moveEn = true;
+            }
+            return false;
+        });
+        $('#areaWrapper').mousedown(function (event) {
+            return false;
+        });
+
+        $(document).mouseup(function (event) {
+            area.moveEn = false;
+            area.reSizeEn = false;
+            if (!area.onTarget)
+                $(document.body).css('cursor', 'default');
+        });
+
+
+        $(document).mousemove(function (event) {
+            if (area.moveEn) {
+                area.move(event, container);
+            } else if (area.reSizeEn) {
+                area.reSize(event, container);
+            }
+        });
+
+        $('#cornersImg').mouseenter(function (event) {
+            area.onCornersImg = true;
+        });
+        $('#cornersImg').mouseleave(function (event) {
+            area.onCornersImg = false;
+
+        });
+
+        $('#cornersImg').mousedown(function (event) {
+            area.reSizeEn = true;
+            area.rememberCurrentSize();
+            area.rememberCurrentPosition();
+            area.rememberStartResize(event);
+        });
+
+        $('imgContainer').scroll(function () {
+            alert('fg')
+        });
+
+        function containerObj(container) {
+            this.object = container;
+            this.init = function () {
+                var fragment = $(document.createDocumentFragment()).append(
+                    '<img id = "helpImg" src = "help.png">' +
+                    '<div id = "helpSectionWrapper">' +
+                    '<div id = "helpSection"> <div id = "helpArea"> <span> Справка </span> <br> Для выбора фотографии нажмите на свободную, от области выделения (пунктирный прямоугольник) часть поля. <br><br> Изменяя размеры  и положение области выделения, отметьте часть или все изображение для загрузки на сервер <br><br> Нажмите кнопку загрузить </div> </div>' +
+                    '</div>' +
+                    '<div id = "shadowWrapper">' +
+                    '<label id="label">' +
+                    '<div id="userImg" class="addFile"> Выберите фото </div>' +
+                    '<input type="file">' +
+                    '</label>' +
+
+                    '<div id = "areaWrapper">' +
+                    '<div id = "selectArea"> </div>' +
+                    '<img id = "cornersImg" src = "imgPoint.png">' +
+                    '</div>' +
+                    '</div>' +
+                    '<div id = "loadButton"> Загрузить </div>');
+                imgContainer.append(fragment);
+                this.positionX = Math.round(this.object.offset().left);
+                this.positionY = Math.round(this.object.offset().top);
+                this.width = Math.round(this.object.css('width').split('px')[0]);
+                this.height = Math.round(this.object.css('height').split('px')[0]);
+                this.borderWidth = Math.round(this.object.css('borderRightWidth').split('px')[0]) + Math.round($('#areaWrapper').css('borderRightWidth').split('px')[0]);
+                $('#areaWrapper').css('box-shadow', '0px 0px 0px ' + this.width + 'px rgba(0, 0, 0, 0.5)');
+                return this;
+            }
+        }
+
+        function selAreaObj(selArea) {
+            var shiftX,
+                shiftY,
+                startReSizeX = 0,
+                startReSizeY = 0,
+                currentSizeX = 0,
+                currentSizeY = 0,
+                currentPositionX,
+                currentPositionY;
+
+            this.object = selArea;
+            this.onTarget = false;
+            this.onCornersImg = false;
+            this.moveEn = false;
+
+            this.setShift = function (x, y) {
+                shiftX = x;
+                shiftY = y;
+            }
+            this.rememberStartResize = function (event) {
+                startReSizeX = event.pageX;
+                startReSizeY = event.pageY;
+            }
+            this.rememberCurrentSize = function () {
+                var currentSize = this.getSize();
+                currentSizeX = currentSize[0];
+                currentSizeY = currentSize[1];
+            }
+            this.rememberCurrentPosition = function () {
+                var currentPosition = this.getPosition();
+                currentPositionX = currentPosition[0];
+                currentPositionY = currentPosition[1];
+            }
+
+            this.getSize = function () {
+                var width = Math.round(this.object.css('width').split('px')[0]),
+                    height = Math.round(this.object.css('height').split('px')[0]);
+                return new Array(width, height);
+            }
+            this.getPosition = function () {
+                var positionX = Math.round(this.object.offset().left),
+                    positionY = Math.round(this.object.offset().top);
+                return new Array(positionX, positionY);
+            }
+
+            this.move = function (event, container) {
+                var relativeX = event.pageX - container.positionX,
+                    relativeY = event.pageY - container.positionY,
+                    currentAreaSize = this.getSize(),
+                    moveX = relativeX - shiftX,
+                    moveY = relativeY - shiftY;
+
+                if (moveX < 0) moveX = 0;
+                if (moveY < 0) moveY = 0;
+                if (moveX > (container.width - currentAreaSize[0] - container.borderWidth)) moveX = (container.width - currentAreaSize[0] - 2 * container.borderWidth);
+                if (moveY > (container.height - currentAreaSize[1] - container.borderWidth)) moveY = (container.height - currentAreaSize[1] - 2 * container.borderWidth);
+
+                this.object.css('left', moveX + 'px').css('top', moveY + 'px');
+            }
+            this.reSize = function (event, container) {
+                var leftMargin = currentPositionX - container.positionX,
+                    topMargin = currentPositionY - container.positionY,
+                    deltaX = (event.pageX - startReSizeX),
+                    sizeX = currentSizeX + deltaX,
+                    sizeY = (sizeX * 3) / 4;
+
+                if (sizeX + leftMargin > container.width) {
+                    sizeX = container.width - 2 * container.borderWidth - leftMargin;
+                    sizeY = (sizeX * 3) / 4;
+                }
+                if (sizeY + topMargin > container.height) {
+                    sizeY = container.height - 2 * container.borderWidth - topMargin;
+                    sizeX = (sizeY * 4) / 3;
+                }
+                this.object.css('width', sizeX + 'px').css('height', sizeY + 'px');
+            }
+        }
+
+        // image load
+        imgContainer.change(function (event) {
+            var allowedFileTypes = ["image/png", "image/jpeg", "image/gif", "image/bmp", "image/tiff", "image/pict"];
+            if (event.target.files) {
+                if (window.URL) {
+                    if (allowedFileTypes.indexOf(event.target.files[0].type) > -1) {
+                        userPhoto = event.target.files[0];
+                        $('#userImg').html('<img id = "uImg" src = "' +
+                                URL.createObjectURL(event.target.files[0]) + '">')
+                            .removeClass('addFile')
+                            .addClass('userPhoto');
+                    } else {
+                        $('#loadButton').text("Пожалуйста выберите фотографию! Файл:" + event.target.files[0].name + " Не является фотографией!");
+                        $('#loadButton').css('color', 'red')
+                            .css('box-shadow', '0px 0px 2px 3px red');
+                        setTimeout(function () {
+                            $('#loadButton').text("Загрузить");
+                            $('#loadButton').css('color', 'black')
+                                .css('box-shadow', '0px 0px 2px 3px #B3B3B3');;
+                        }, 3000);
+                        return;
+                    }
+                } else {
+                    $('#loadButton').text("Пожалуйста обновите Вашу версию браузера!");
+                    $('#loadButton').css('color', 'red')
+                        .css('box-shadow', '0px 0px 2px 3px red');
+                    setTimeout(function () {
+                        $('#loadButton').text("Загрузить");
+                        $('#loadButton').css('color', 'black')
+                            .css('box-shadow', '0px 0px 2px 3px #B3B3B3');;
+                    }, 3000);
+                }
+
+            }
+        });
+        $('#loadButton').click(function () {
+            loadDone = false;
+            if (userPhoto) {
+                var position = area.getPosition(),
+                    size = area.getSize(),
+                    borderWidth = 2 * Math.round($('#areaWrapper').css('borderLeftWidth').split('px')[0]),
+
+                    areaRealWidth = size[0] + borderWidth,
+                    areaRealHeight = size[1] + borderWidth - 2,
+                    areaPositionN = position[1] - container.positionY,
+                    areaPositionS = areaPositionN + areaRealHeight,
+                    areaPositionW = position[0] - container.positionX,
+                    areaPositionE = areaPositionW + areaRealWidth,
+
+                    imgWidth = Math.round($('#uImg').css('width').split('px')[0]),
+                    imgHeight = Math.round($('#uImg').css('height').split('px')[0]),
+                    imgPositionN = Math.round($('#uImg').offset().top) - container.positionY,
+                    imgPositionS = imgPositionN + imgHeight,
+                    imgPositionW = Math.round($('#uImg').offset().left) - container.positionX,
+                    imgPositionE = imgPositionW + imgWidth;
+
+                if ((areaPositionW - imgPositionW < 0) || (areaPositionN - imgPositionN < 0) || (areaPositionS - imgPositionS > 0) || (areaPositionE - imgPositionE > 0)) {
+                    $('#loadButton').text("Область выделения выходит за края фотографии!");
+                    $('#loadButton').css('color', 'red')
+                        .css('box-shadow', '0px 0px 2px 3px red');
+                    setTimeout(function () {
+                        $('#loadButton').text("Загрузить");
+                        $('#loadButton').css('color', 'black')
+                            .css('box-shadow', '0px 0px 2px 3px #B3B3B3');
+                    }, 3000);
+                } else {
+                    var cutTop = ((areaPositionN - imgPositionN) / imgHeight * 100),
+                        cutRight = (((areaPositionE - imgPositionE) * -1) / imgWidth * 100),
+                        cutBottom = (((areaPositionS - imgPositionS) * -1) / imgHeight * 100),
+                        cutLeft = ((areaPositionW - imgPositionW) / imgWidth * 100);
+
+                    var form = new FormData();
+                    form.append("userImg", userPhoto);
+                    form.append("cuts", new Array(cutTop, cutRight, cutBottom, cutLeft));
+                    $.ajax({
+                            method: "POST",
+                            url: "loadImgPHP.php",
+                            data: form,
+                            processData: false,
+                            contentType: false,
+                            async: true,
+                            beforeSend: function () {
+                                $('#loadButton').css('color', '#42B9FF')
+                                    .css('box-shadow', '0px 0px 2px 3px #42B9FF');
+                            },
+                            xhr: function () {
+                                var xhr = $.ajaxSettings.xhr();
+                                xhr.upload.addEventListener("progress", function (event) {
+                                    if (event.lengthComputable) {
+                                        var percentComplete = event.loaded / event.total;
+                                        if (Math.round(percentComplete * 100) > 98 && !loadDone) {
+                                            percentComplete = 0.98;
+                                        }
+                                        $('#loadButton').text('Загрузка: ' + Math.round(percentComplete * 100) + "%");
+
+                                    } else {
+                                        alert(event.loaded);
+                                    }
+                                }, false);
+                                return xhr;
+                            }
+                        })
+                        .done(function (msg) {
+                            if (msg == 'load:done') {
+                                loadDone = true;
+                                $('#loadButton').text('Загрузка: 100%');
+                                $('#loadButton').text("Фотография загружена!");
+                                $('#loadButton').css('color', 'green')
+                                    .css('box-shadow', '0px 0px 2px 3px green');
+                                setTimeout(function () {
+                                    $('#loadButton').text("Загрузить");
+                                    $('#loadButton').css('color', 'black')
+                                        .css('box-shadow', '0px 0px 2px 3px #B3B3B3');
+                                    $('#userImg').html('Выберите фото')
+                                        .removeClass('userPhoto')
+                                        .addClass('addFile');
+                                    userPhoto = false;
+                                }, 1500);
+                            } else {
+                                $('#loadButton').text("Произошел сбой соединения, попробуйте еще раз!");
+                                $('#loadButton').css('color', 'red')
+                                    .css('box-shadow', '0px 0px 2px 3px red');
+                                setTimeout(function () {
+                                    $('#loadButton').text("Загрузить");
+                                    $('#loadButton').css('color', 'black')
+                                        .css('box-shadow', '0px 0px 2px 3px #B3B3B3');;
+                                }, 3000);
+                            }
+                        });
+                }
+            } else {
+                $('#loadButton').text("Выберите фотографию для загрузки!");
+                $('#loadButton').css('color', 'red')
+                    .css('box-shadow', '0px 0px 2px 3px red');
+                setTimeout(function () {
+                    $('#loadButton').text("Загрузить");
+                    $('#loadButton').css('color', 'black')
+                        .css('box-shadow', '0px 0px 2px 3px #B3B3B3');
+                }, 3000);
+            }
+        });
+
+    }($('#imgContainer')));
+</script>
+
+</html>
